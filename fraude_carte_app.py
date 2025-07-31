@@ -10,7 +10,7 @@ from fpdf import FPDF
 
 # --------------------------
 # Charger les données équilibrées
-# --------------------------
+# -------------------------- 
 @st.cache_data
 def charger_donnees():
     try:
