@@ -51,54 +51,16 @@ def enregistrer_historique(client_id, amount, proba, is_fraude, action):
         pd.DataFrame([ligne]).to_csv(chemin, mode="a", header=False, index=False)
 
 # --------------------------
-# Génération PDF
-# --------------------------
-def generer_pdf(chemin_csv, chemin_pdf="rapport_fraude.pdf"):
-    df = pd.read_csv(chemin_csv)
-    nb_total = len(df)
-    nb_fraudes = df[df["Fraude"] == "Oui"].shape[0]
-    nb_normales = df[df["Fraude"] == "Non"].shape[0]
-    montant_fraude = df[df["Fraude"] == "Oui"]["Montant"].mean()
-    montant_normal = df[df["Fraude"] == "Non"]["Montant"].mean()
-    derniere_date = df["Date"].max()
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Rapport de Détection de Fraude", ln=True)
-
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(5)
-    pdf.cell(0, 10, f"Total transactions : {nb_total}", ln=True)
-    pdf.cell(0, 10, f"Transactions normales : {nb_normales}", ln=True)
-    pdf.cell(0, 10, f"Fraudes détectées : {nb_fraudes}", ln=True)
-    pdf.cell(0, 10, f"Montant moyen fraude : {montant_fraude:.2f} €", ln=True)
-    pdf.cell(0, 10, f"Montant moyen normal : {montant_normal:.2f} €", ln=True)
-    pdf.cell(0, 10, f"Dernière détection : {derniere_date}", ln=True)
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Dernières transactions :", ln=True)
-    pdf.set_font("Arial", "", 10)
-
-    for _, row in df.tail(5).iterrows():
-        ligne = f"{row['Date']} | Client {row['ClientID']} | {row['Montant']} € | {row['Fraude']} | {row['Action']}"
-        pdf.cell(0, 8, ligne, ln=True)
-
-    pdf.output(chemin_pdf)
-    return chemin_pdf
-
-# --------------------------
 # Interface principale
 # --------------------------
 st.set_page_config(page_title="Détection de Fraude", layout="centered")
-st.markdown("<h1 style='font-size: 40px;'>💳 Détection de Fraude Bancaire</h1>", unsafe_allow_html=True)
+st.title("💳 Détection de Fraude Bancaire")
 
 chemin = "historique_fraude.csv"
 df, encoders = charger_donnees()
 model = entrainer_modele(df)
 
-st.markdown("<h2 style='font-size: 26px;'>📊 Importance des variables</h2>", unsafe_allow_html=True)
+st.subheader("📊 Importance des variables")
 importances = model.feature_importances_
 features = df.drop("Fraude", axis=1).columns
 fig, ax = plt.subplots()
@@ -107,9 +69,8 @@ ax.set_xlabel("Importance")
 ax.set_title("Poids des variables")
 st.pyplot(fig)
 
-
 with st.form("formulaire_transaction"):
-    st.markdown("<h2 style='font-size: 26px;'>📝 Saisir une transaction</h2>", unsafe_allow_html=True)
+    st.subheader("📝 Saisir une transaction")
     client_id = st.number_input("🆔 ID Client", min_value=1000, max_value=1100, value=1005)
     amount = st.number_input("💰 Montant (€)", min_value=0.01, value=100.0)
     heure = st.slider("🕒 Heure de la transaction", 0, 23, 12)
@@ -143,40 +104,37 @@ if submit:
     prediction = model.predict(df_input)[0]
     proba = model.predict_proba(df_input)[0][1]
 
-    st.markdown("<h2 style='font-size: 26px;'>🔍 Résultat</h2>", unsafe_allow_html=True)
+    st.subheader("🔍 Résultat")
     if proba > seuil:
         if amount <= 500:
             action = "Confirmation manuelle"
             st.info("Transaction suspecte. Veuillez confirmer si vous l'avez autorisée.")
             st.button("✅ Je confirme cette transaction")
             st.button("❌ Ce n'était pas moi")
-
         elif 100 < amount <= 1000:
             action = "Demande SMS"
             st.warning("Transaction moyenne détectée comme suspecte.")
             st.button("📩 Demander un code de confirmation par SMS")
             st.button("✅ Je confirme manuellement")
-
         else:
             action = "Blocage et contact conseiller"
             st.error("🚫 Transaction à montant élevé bloquée temporairement.")
             st.button("📞 Contacter mon conseiller")
             st.button("🔁 Demander vérification par un agent")
 
-        st.markdown(f"<div style='color: red; font-size: 22px;'>🚨 <b>FRAUDE détectée !</b><br>Probabilité : {proba:.2%}</div>", unsafe_allow_html=True)
+        st.error(f"🚨 FRAUDE détectée ! Probabilité : {proba:.2%}")
         enregistrer_historique(client_id, amount, proba, True, action)
     else:
         action = "Aucune"
-        st.markdown(f"<div style='color: green; font-size: 22px;'>✅ <b>Transaction normale</b><br>Probabilité : {proba:.2%}</div>", unsafe_allow_html=True)
+        st.success(f"✅ Transaction normale. Probabilité de fraude : {proba:.2%}")
         enregistrer_historique(client_id, amount, proba, False, action)
 
-    
     fig2, ax2 = plt.subplots()
     ax2.bar(["Normale", "Fraude"], model.predict_proba(df_input)[0])
     ax2.set_ylabel("Probabilité")
     st.pyplot(fig2)
 
-st.markdown("<h2 style='font-size: 24px;'>🧾 Historique des détections</h2>", unsafe_allow_html=True)
+st.subheader("🧾 Historique des détections")
 if os.path.exists(chemin):
     historique = pd.read_csv(chemin)
     st.dataframe(historique)
@@ -185,4 +143,3 @@ if os.path.exists(chemin):
         st.success("Historique supprimé avec succès.")
 else:
     st.info("Aucune transaction enregistrée pour le moment.")
-
