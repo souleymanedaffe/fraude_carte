@@ -6,7 +6,6 @@ from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import os
 import matplotlib.pyplot as plt
-from fpdf import FPDF
 
 # --------------------------
 # Charger les données équilibrées
