@@ -8,12 +8,15 @@ import os
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 
+# --------------------------
+# Charger les données équilibrées
+# --------------------------
 @st.cache_data
 def charger_donnees():
     try:
-        df = pd.read_csv("fake_transactions_balanced.csv")
+        df = pd.read_csv("fake_transactions_balanced.csv", encoding="utf-8")
     except FileNotFoundError:
-        st.error("Le fichier fake_transactions_balanced.csv est manquant.")
+        st.error("❌ Le fichier 'fake_transactions_balanced.csv' est introuvable. Vérifiez qu'il est bien dans le dépôt.")
         st.stop()
 
     encoders = {}
@@ -21,8 +24,12 @@ def charger_donnees():
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col])
         encoders[col] = le
+
     return df, encoders
 
+# --------------------------
+# Entraîner le modèle
+# --------------------------
 @st.cache_data
 def entrainer_modele(df):
     X = df.drop(columns=["Fraude"])
@@ -31,6 +38,9 @@ def entrainer_modele(df):
     model.fit(X, y)
     return model
 
+# --------------------------
+# Enregistrer dans un historique
+# --------------------------
 def enregistrer_historique(client_id, amount, proba, is_fraude, action):
     ligne = {
         "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -46,6 +56,9 @@ def enregistrer_historique(client_id, amount, proba, is_fraude, action):
     else:
         pd.DataFrame([ligne]).to_csv(chemin, mode="a", header=False, index=False)
 
+# --------------------------
+# Génération PDF
+# --------------------------
 def generer_pdf(chemin_csv, chemin_pdf="rapport_fraude.pdf"):
     df = pd.read_csv(chemin_csv)
     nb_total = len(df)
@@ -89,6 +102,11 @@ st.markdown("<h1 style='font-size: 40px;'>💳 Détection de Fraude Bancaire</h1
 
 chemin = "historique_fraude.csv"
 df, encoders = charger_donnees()
+
+if df.empty:
+    st.error("⚠️ Le fichier CSV est vide.")
+    st.stop()
+
 model = entrainer_modele(df)
 
 st.markdown("<h2 style='font-size: 26px;'>📊 Importance des variables</h2>", unsafe_allow_html=True)
