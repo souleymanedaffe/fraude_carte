@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # --------------------------
 @st.cache_data
 def charger_donnees():
-    df = pd.read_csv("fake_transactions_balanced.csv")
+    df = pd.read_csv("fake_transactions_balanced.csv") 
     encoders = {}
     for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
         le = LabelEncoder()
