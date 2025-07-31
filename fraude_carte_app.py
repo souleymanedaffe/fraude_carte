@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -117,4 +116,3 @@ if os.path.exists(chemin_histo):
     if st.button("Réinitialiser"):
         os.remove(chemin_histo)
         st.experimental_rerun()
-```
