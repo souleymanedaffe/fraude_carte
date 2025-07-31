@@ -84,35 +84,60 @@ with st.form("tx_form"):
     submit = st.form_submit_button("Vérifier")
 
 seuil = 0.5
+
 if submit:
-    data = {"ClientID": client_id,
-            "Amount": amount,
-            "Heure": heure,
-            "DeltaHeure": delta_heure,
-            "NbTransactions24h": nb_tx,
-            "Pays": encoders["Pays"].transform([pays])[0],
-            "PaysResidence": encoders["PaysResidence"].transform([pays_res])[0],
-            "Carte": encoders["Carte"].transform([carte])[0],
-            "DeviceType": encoders["DeviceType"].transform([device])[0],
-            "EnLigne": encoders["EnLigne"].transform([en_ligne])[0]}
-    df_input = pd.DataFrame([data])
+    input_data = {
+        "ClientID": client_id,
+        "Amount": amount,
+        "Heure": heure,
+        "HeurePreferee": heure_pref,
+        "DeltaHeure": delta_heure,
+        "NbTransactions24h": nb_tx_24h,
+        "Pays": encoders["Pays"].transform([pays])[0],
+        "PaysResidence": encoders["PaysResidence"].transform([pays_res])[0],
+        "Carte": encoders["Carte"].transform([carte])[0],
+        "DeviceType": encoders["DeviceType"].transform([device])[0],
+        "EnLigne": encoders["EnLigne"].transform([en_ligne])[0]
+    }
+
+    df_input = pd.DataFrame([input_data])
+    prediction = model.predict(df_input)[0]
     proba = model.predict_proba(df_input)[0][1]
-    is_fraud = proba > seuil
 
-    st.subheader("Résultat")
-    if is_fraud:
-        st.warning(f"🚨 FRAUDE probable ({proba:.2%})")
-        action = "Vérification"
+    st.markdown("<h2 style='font-size: 26px;'>🔍 Résultat</h2>", unsafe_allow_html=True)
+
+    if proba > seuil:
+        # Choisir l'action selon le montant
+        if amount <= 500:
+            action = "Confirmation manuelle"
+            st.info("Transaction suspecte. Veuillez confirmer si vous l'avez autorisée.")
+        elif 100 < amount <= 1000:
+            action = "Demande SMS"
+            st.warning("Transaction moyenne détectée comme suspecte.")
+        else:
+            action = "Blocage et contact conseiller"
+            st.error("🚫 Transaction à montant élevé bloquée temporairement.")
+
+        st.markdown(f"<div style='color: red; font-size: 22px;'>🚨 <b>FRAUDE détectée !</b><br>Probabilité : {proba:.2%}</div>", unsafe_allow_html=True)
+
+        # ✅ Affichage conditionnel via st.session_state
+        if "fraude_action" not in st.session_state:
+            st.session_state.fraude_action = ""
+
+        with st.expander("🔧 Choisir une action manuelle", expanded=True):
+            action_choice = st.radio("Choisissez :", ["Confirmer", "Refuser", "Demander un SMS", "Appeler conseiller"])
+            if st.button("✅ Valider l'action sélectionnée"):
+                st.success(f"Action enregistrée : {action_choice}")
+                st.session_state.fraude_action = action_choice
+
+        enregistrer_historique(client_id, amount, proba, True, action)
+
     else:
-        st.success(f"✅ OK ({proba:.2%})")
         action = "Aucune"
-    enregistrer_historique(client_id, amount, proba, is_fraud, action)
+        st.markdown(f"<div style='color: green; font-size: 22px;'>✅ <b>Transaction normale</b><br>Probabilité : {proba:.2%}</div>", unsafe_allow_html=True)
+        enregistrer_historique(client_id, amount, proba, False, action)
 
-# Historique
-st.subheader("Historique")
-if os.path.exists(chemin_histo):
-    hist = pd.read_csv(chemin_histo)
-    st.dataframe(hist)
-    if st.button("Réinitialiser"):
-        os.remove(chemin_histo)
-        st.experimental_rerun()
+    fig2, ax2 = plt.subplots()
+    ax2.bar(["Normale", "Fraude"], model.predict_proba(df_input)[0])
+    ax2.set_ylabel("Probabilité")
+    st.pyplot(fig2)
