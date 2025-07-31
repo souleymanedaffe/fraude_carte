@@ -20,7 +20,7 @@ def charger_donnees():
         df[col] = le.fit_transform(df[col])
         encoders[col] = le
     return df, encoders
-
+ 
 # --------------------------
 # Entraîner le modèle
 # --------------------------
