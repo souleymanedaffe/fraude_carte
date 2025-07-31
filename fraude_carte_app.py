@@ -14,7 +14,7 @@ from fpdf import FPDF
 @st.cache_data
 def charger_donnees():
     try:
-        df = pd.read_csv(fake_transactions_balanced.csv", encoding="utf-8)
+        df = pd.read_csv("fake_transactions_balanced.csv", encoding="utf-8")
     except FileNotFoundError:
         st.error("❌ Le fichier 'fake_transactions_balanced.csv' est introuvable. Vérifiez qu'il est bien dans le dépôt.")
         st.stop()
