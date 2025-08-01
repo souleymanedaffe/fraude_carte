@@ -5,7 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import os
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 # --------------------------
 # Charger les données équilibrées
@@ -59,15 +59,28 @@ chemin = "historique_fraude.csv"
 df, encoders = charger_donnees()
 model = entrainer_modele(df)
 
+# --------------------------
+# Affichage des importances avec Plotly
+# --------------------------
 st.subheader("📊 Importance des variables")
 importances = model.feature_importances_
 features = df.drop("Fraude", axis=1).columns
-fig, ax = plt.subplots()
-ax.barh(features, importances)
-ax.set_xlabel("Importance")
-ax.set_title("Poids des variables")
-st.pyplot(fig)
+importance_df = pd.DataFrame({
+    "Feature": features,
+    "Importance": importances
+})
+fig = px.bar(
+    importance_df.sort_values(by="Importance", ascending=True),
+    x="Importance",
+    y="Feature",
+    orientation="h",
+    title="Poids des variables"
+)
+st.plotly_chart(fig, use_container_width=True)
 
+# --------------------------
+# Formulaire de transaction
+# --------------------------
 with st.form("formulaire_transaction"):
     st.subheader("📝 Saisir une transaction")
     client_id = st.number_input("🆔 ID Client", min_value=1000, max_value=1100, value=1005)
@@ -83,6 +96,9 @@ with st.form("formulaire_transaction"):
     en_ligne = st.selectbox("🛒 En ligne ?", ["Oui", "Non"])
     submit = st.form_submit_button("🔍 Vérifier la transaction")
 
+# --------------------------
+# Résultat de la détection
+# --------------------------
 seuil = 0.5
 if submit:
     input_data = {
@@ -128,11 +144,25 @@ if submit:
         st.success(f"✅ Transaction normale. Probabilité de fraude : {proba:.2%}")
         enregistrer_historique(client_id, amount, proba, False, action)
 
-    fig2, ax2 = plt.subplots()
-    ax2.bar(["Normale", "Fraude"], model.predict_proba(df_input)[0])
-    ax2.set_ylabel("Probabilité")
-    st.pyplot(fig2)
+    # Graphique Plotly des probabilités
+    proba_df = pd.DataFrame({
+        "Classe": ["Normale", "Fraude"],
+        "Probabilité": model.predict_proba(df_input)[0]
+    })
+    fig2 = px.bar(
+        proba_df,
+        x="Classe",
+        y="Probabilité",
+        title="Probabilité de prédiction",
+        text="Probabilité"
+    )
+    fig2.update_traces(texttemplate='%{text:.2%}', textposition='outside')
+    fig2.update_layout(yaxis_range=[0, 1])
+    st.plotly_chart(fig2, use_container_width=True)
 
+# --------------------------
+# Historique
+# --------------------------
 st.subheader("🧾 Historique des détections")
 if os.path.exists(chemin):
     historique = pd.read_csv(chemin)
