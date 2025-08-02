@@ -6,7 +6,6 @@ from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import os
 import plotly.express as px
-st.write("✅ Début de l'exécution de l'application")
 
 # --------------------------
 # Charger les données équilibrées
@@ -14,19 +13,12 @@ st.write("✅ Début de l'exécution de l'application")
 @st.cache_data
 def charger_donnees():
     df = pd.read_csv("fake_transactions_balanced.csv")
-    df, encoders = charger_donnees()
-    st.write("✅ Données chargées")
-
-model = entrainer_modele(df)
-
-st.write("✅ Modèle entraîné")
-
-encoders = {}
-for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
+    encoders = {}
+    for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col])
         encoders[col] = le
-        return df, encoders
+    return df, encoders
 
 # --------------------------
 # Entraîner le modèle
@@ -171,7 +163,6 @@ if submit:
 # --------------------------
 # Historique
 # --------------------------
-
 st.subheader("🧾 Historique des détections")
 if os.path.exists(chemin):
     historique = pd.read_csv(chemin)
@@ -181,5 +172,3 @@ if os.path.exists(chemin):
         st.success("Historique supprimé avec succès.")
 else:
     st.info("Aucune transaction enregistrée pour le moment.")
-st.write("✅ L'application est bien lancée.")
-
