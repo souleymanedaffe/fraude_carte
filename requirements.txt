@@ -1,6 +1,6 @@
 streamlit
 pandas
-numpy==1.
+numpy
 scikit-learn
 openpyxl
 matplotlib
@@ -12,3 +12,4 @@ folium
 streamlit-folium
 requests
 plotly
+
