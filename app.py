@@ -21,12 +21,12 @@ model = entrainer_modele(df)
 
 st.write("✅ Modèle entraîné")
 
-    encoders = {}
-    for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
+encoders = {}
+for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col])
         encoders[col] = le
-    return df, encoders
+        return df, encoders
 
 # --------------------------
 # Entraîner le modèle
