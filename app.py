@@ -171,14 +171,5 @@ if submit:
 # --------------------------
 # Historique
 # --------------------------
-st.subheader("🧾 Historique des détections")
-if os.path.exists(chemin):
-    historique = pd.read_csv(chemin)
-    st.dataframe(historique)
-    if st.button("🗑️ Réinitialiser l'historique"):
-        os.remove(chemin)
-        st.success("Historique supprimé avec succès.")
-else:
-    st.info("Aucune transaction enregistrée pour le moment.")
-st.write("✅ L'application est bien lancée.")
+
 
