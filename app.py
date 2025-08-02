@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import os
 import plotly.express as px
+st.write("✅ Début de l'exécution de l'application")
 
 # --------------------------
 # Charger les données équilibrées
