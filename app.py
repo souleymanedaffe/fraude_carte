@@ -14,6 +14,13 @@ st.write("✅ Début de l'exécution de l'application")
 @st.cache_data
 def charger_donnees():
     df = pd.read_csv("fake_transactions_balanced.csv")
+    df, encoders = charger_donnees()
+    st.write("✅ Données chargées")
+
+model = entrainer_modele(df)
+
+st.write("✅ Modèle entraîné")
+
     encoders = {}
     for col in ["Pays", "PaysResidence", "Carte", "DeviceType", "EnLigne"]:
         le = LabelEncoder()
