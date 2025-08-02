@@ -172,3 +172,5 @@ if os.path.exists(chemin):
         st.success("Historique supprimé avec succès.")
 else:
     st.info("Aucune transaction enregistrée pour le moment.")
+st.write("✅ L'application est bien lancée.")
+
