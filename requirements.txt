@@ -1,3 +1,14 @@
 streamlit
 pandas
+numpy==1.
 scikit-learn
+openpyxl
+matplotlib
+statsmodels
+xgboost
+seaborn
+joblib
+folium
+streamlit-folium
+requests
+plotly
