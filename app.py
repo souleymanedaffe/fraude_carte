@@ -172,3 +172,11 @@ if os.path.exists(chemin):
         st.success("Historique supprimé avec succès.")
 else:
     st.info("Aucune transaction enregistrée pour le moment.")
+
+# Signature
+st.markdown("""
+<div class="footer">
+    Réalisé par <strong>SOULEYMANE DAFFE - DATA SCIENTIST</strong>
+</div>
+""", unsafe_allow_html=True)
+
