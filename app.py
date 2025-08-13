@@ -257,6 +257,13 @@ if mode == "Espace Utilisateur":
 
     st.markdown('<div class="footer">Espace Utilisateur</div>', unsafe_allow_html=True)
 
+     # Signature
+    st.markdown("""
+    <div class="footer">
+        Réalisé par <strong>SOULEYMANE DAFFE - DATA SCIENTIST</strong>
+    </div>
+    """, unsafe_allow_html=True)
+
 # ========= PARTIE CONSEILLER =========
 else:
     st.title("🛡️ Espace Conseiller")
@@ -442,3 +449,11 @@ else:
                                file_name="historique_fraude.csv", mime="text/csv")
 
     st.markdown('<div class="footer">Espace Conseiller</div>', unsafe_allow_html=True)
+
+
+    # Signature
+    st.markdown("""
+    <div class="footer">
+        Réalisé par <strong>SOULEYMANE DAFFE - DATA SCIENTIST</strong>
+    </div>
+    """, unsafe_allow_html=True)
