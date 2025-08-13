@@ -30,49 +30,46 @@ def plotly_template():
     return "plotly_white" if st.get_option("theme.base") == "light" else "plotly_dark"
 
 # =========================
-# HELPERS
+# PARAMS & HELPERS
 # =========================
 DATA_PATH = "fake_transactions_balanced.csv"
 HISTO_PATH = "historique_fraude.csv"
 SEUIL_USER = 0.50
 
-# colonnes de l'historique (toutes les valeurs saisies + statut)
+# Historique : libellés + codes
 COLUMNS_HISTO = [
     "ID","Date","ClientID","Montant","Probabilité","Fraude",
     "ActionRecommandée","Statut","Décision","Décideur",
+    # Saisie utilisateur (lisible)
     "Heure","HeurePreferee","DeltaHeure","NbTransactions24h",
-    "Pays","PaysResidence","Carte","DeviceType","EnLigne"
+    "Pays","PaysResidence","Carte","DeviceType","EnLigne",
+    # Codes encodés utilisés par le modèle
+    "PaysCode","PaysResidenceCode","CarteCode","DeviceTypeCode","EnLigneCode"
 ]
 
-# conversions sûres (évite les ValueError si csv contient des vides)
 def to_int(x, default=0):
     try:
-        if x is None: return default
-        s = str(x).strip()
-        if s == "" or s.lower() in ("nan", "none"): return default
+        s = "" if x is None else str(x).strip()
+        if s == "" or s.lower() in ("nan","none"): return default
         return int(float(s.replace(",", ".")))
     except Exception:
         return default
 
 def to_float(x, default=0.0):
     try:
-        if x is None: return default
-        s = str(x).strip()
-        if s == "" or s.lower() in ("nan", "none"): return default
+        s = "" if x is None else str(x).strip()
+        if s == "" or s.lower() in ("nan","none"): return default
         return float(s.replace(",", "."))
     except Exception:
         return default
 
 def to_str(x, default=""):
-    s = "" if x is None else str(x)
-    s = s.strip()
-    return s if s not in ("", "nan", "None", "NaN") else default
+    s = "" if x is None else str(x).strip()
+    return s if s not in ("","nan","NaN","None") else default
 
 def find_index(options:list, value:str, default_idx:int=0):
-    try:
-        return options.index(value)
-    except ValueError:
-        return default_idx
+    try: return options.index(value)
+    except ValueError: return default_idx
 
 @st.cache_data(show_spinner=False)
 def charger_donnees(path: str = DATA_PATH):
@@ -93,12 +90,10 @@ def entrainer_modele(df: pd.DataFrame):
     return model
 
 def ensure_histo():
-    """Crée un CSV propre si manquant/vide."""
     if (not os.path.exists(HISTO_PATH)) or os.path.getsize(HISTO_PATH) == 0:
         pd.DataFrame(columns=COLUMNS_HISTO).to_csv(HISTO_PATH, index=False, encoding="utf-8", quoting=csv.QUOTE_MINIMAL)
 
 def charger_historique():
-    """Lecture robuste; si corrompu -> sauvegarde .bak + réinitialisation."""
     ensure_histo()
     try:
         df = pd.read_csv(HISTO_PATH, encoding="utf-8", engine="python", on_bad_lines="skip", dtype=str)
@@ -114,7 +109,7 @@ def charger_historique():
         return pd.DataFrame(columns=COLUMNS_HISTO)
 
 def enregistrer_historique(client_id, amount, proba, is_fraude, action_reco, payload: dict):
-    """Ajoute une ligne à l'historique avec **toutes** les valeurs saisies (lisibles)."""
+    """Ajoute une ligne à l'historique avec libellés + codes (garanti identiques à la saisie)."""
     ensure_histo()
     rec_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
     row = {
@@ -128,16 +123,22 @@ def enregistrer_historique(client_id, amount, proba, is_fraude, action_reco, pay
         "Statut": "En attente",
         "Décision": "",
         "Décideur": "",
-        # champs de saisie utilisateur (texte lisible)
-        "Heure": to_int(payload.get("Heure"), 0),
-        "HeurePreferee": to_int(payload.get("HeurePreferee"), 0),
-        "DeltaHeure": to_int(payload.get("DeltaHeure"), 0),
-        "NbTransactions24h": to_int(payload.get("NbTransactions24h"), 0),
-        "Pays": to_str(payload.get("Pays"), ""),
-        "PaysResidence": to_str(payload.get("PaysResidence"), ""),
-        "Carte": to_str(payload.get("Carte"), ""),
-        "DeviceType": to_str(payload.get("DeviceType"), ""),
-        "EnLigne": "Oui" if to_str(payload.get("EnLigne"), "Non") == "Oui" else "Non",
+        # lisible
+        "Heure": to_int(payload["Heure"]),
+        "HeurePreferee": to_int(payload["HeurePreferee"]),
+        "DeltaHeure": to_int(payload["DeltaHeure"]),
+        "NbTransactions24h": to_int(payload["NbTransactions24h"]),
+        "Pays": to_str(payload["Pays"]),
+        "PaysResidence": to_str(payload["PaysResidence"]),
+        "Carte": to_str(payload["Carte"]),
+        "DeviceType": to_str(payload["DeviceType"]),
+        "EnLigne": "Oui" if to_str(payload["EnLigne"]) == "Oui" else "Non",
+        # codes
+        "PaysCode": to_int(payload["PaysCode"]),
+        "PaysResidenceCode": to_int(payload["PaysResidenceCode"]),
+        "CarteCode": to_int(payload["CarteCode"]),
+        "DeviceTypeCode": to_int(payload["DeviceTypeCode"]),
+        "EnLigneCode": to_int(payload["EnLigneCode"]),
     }
     write_header = (not os.path.exists(HISTO_PATH)) or os.path.getsize(HISTO_PATH) == 0
     pd.DataFrame([row]).to_csv(HISTO_PATH, mode="a", header=write_header, index=False, encoding="utf-8", quoting=csv.QUOTE_MINIMAL)
@@ -182,7 +183,7 @@ st.markdown("""
 
 mode = st.radio("Navigation", ["Espace Utilisateur", "Espace Conseiller"], horizontal=True, label_visibility="collapsed")
 
-# ========= PARTIE UTILISATEUR (sans graphiques) =========
+# ========= PARTIE UTILISATEUR =========
 if mode == "Espace Utilisateur":
     st.subheader("📝 Saisir une transaction")
     col1, col2, col3 = st.columns([1,1,1])
@@ -204,22 +205,20 @@ if mode == "Espace Utilisateur":
         submit = st.form_submit_button("🔍 Vérifier la transaction")
 
     if submit:
-        # valeurs lisibles pour l'historique
-        payload = {
-            "Heure": heure, "HeurePreferee": heure_pref, "DeltaHeure": delta_heure,
-            "NbTransactions24h": nb_tx_24h, "Pays": pays, "PaysResidence": pays_res,
-            "Carte": carte, "DeviceType": device, "EnLigne": en_ligne,
+        # Codes pour le modèle
+        codes = {
+            "PaysCode": encoders["Pays"].transform([pays])[0],
+            "PaysResidenceCode": encoders["PaysResidence"].transform([pays_res])[0],
+            "CarteCode": encoders["Carte"].transform([carte])[0],
+            "DeviceTypeCode": encoders["DeviceType"].transform([device])[0],
+            "EnLigneCode": encoders["EnLigne"].transform([en_ligne])[0],
         }
-        # valeurs encodées pour le modèle
         model_input = pd.DataFrame([{
             "ClientID": client_id, "Amount": amount,
             "Heure": heure, "HeurePreferee": heure_pref, "DeltaHeure": delta_heure,
             "NbTransactions24h": nb_tx_24h,
-            "Pays": encoders["Pays"].transform([pays])[0],
-            "PaysResidence": encoders["PaysResidence"].transform([pays_res])[0],
-            "Carte": encoders["Carte"].transform([carte])[0],
-            "DeviceType": encoders["DeviceType"].transform([device])[0],
-            "EnLigne": encoders["EnLigne"].transform([en_ligne])[0],
+            "Pays": codes["PaysCode"], "PaysResidence": codes["PaysResidenceCode"],
+            "Carte": codes["CarteCode"], "DeviceType": codes["DeviceTypeCode"], "EnLigne": codes["EnLigneCode"],
         }])
         proba = float(model.predict_proba(model_input)[0][1])
         pred_fraude = proba > SEUIL_USER
@@ -247,12 +246,18 @@ if mode == "Espace Utilisateur":
             st.button("📞 Contacter mon conseiller"); st.button("🔁 Demander vérification par un agent")
             action_txt = "Blocage et contact conseiller"
 
+        # Payload avec **libellés** + **codes**
+        payload = {
+            "Heure": heure, "HeurePreferee": heure_pref, "DeltaHeure": delta_heure, "NbTransactions24h": nb_tx_24h,
+            "Pays": pays, "PaysResidence": pays_res, "Carte": carte, "DeviceType": device, "EnLigne": en_ligne,
+            **codes
+        }
         rec_id = enregistrer_historique(client_id, amount, proba, pred_fraude, action_txt, payload)
         st.info(f"🧾 Demande transmise au conseiller (ID : {rec_id}).")
 
     st.markdown('<div class="footer">Espace Utilisateur</div>', unsafe_allow_html=True)
 
-# ========= PARTIE CONSEILLER (formulaire pré-rempli + graphes) =========
+# ========= PARTIE CONSEILLER =========
 else:
     st.title("🛡️ Espace Conseiller")
     seuil_conseiller = st.slider("Seuil de décision (interne conseiller)", 0.05, 0.95, 0.50, 0.01)
@@ -270,7 +275,7 @@ else:
             st.markdown("#### Détails (formulaire pré-rempli à partir de la dernière saisie utilisateur)")
             edit_mode = st.toggle("Permettre modification avant décision", value=False)
 
-            # valeurs par défaut (conversion robuste)
+            # valeurs par défaut (robustes)
             h  = to_int(last.get("Heure"), 12)
             hp = to_int(last.get("HeurePreferee"), 14)
             dh = to_int(last.get("DeltaHeure"), abs(h - hp))
@@ -284,6 +289,12 @@ else:
                 "Carte": to_str(last.get("Carte"), ""),
                 "DeviceType": to_str(last.get("DeviceType"), ""),
                 "EnLigne": "Oui" if to_str(last.get("EnLigne"), "Non") == "Oui" else "Non",
+                # codes d'origine (garantissent l'identique à la saisie)
+                "PaysCode": to_int(last.get("PaysCode")),
+                "PaysResidenceCode": to_int(last.get("PaysResidenceCode")),
+                "CarteCode": to_int(last.get("CarteCode")),
+                "DeviceTypeCode": to_int(last.get("DeviceTypeCode")),
+                "EnLigneCode": to_int(last.get("EnLigneCode")),
             }
 
             pays_opts  = sorted(list(encoders["Pays"].classes_))
@@ -312,35 +323,44 @@ else:
                                           index=find_index(dev_opts, def_val["DeviceType"]), disabled=not edit_mode)
                     en_ligne = st.selectbox("🛒 En ligne ?", ["Oui", "Non"],
                                             index=(0 if def_val["EnLigne"] == "Oui" else 1), disabled=not edit_mode)
-                submit_eval = st.form_submit_button("🔍 Évaluer / Mettre à jour l'aperçu")
+                st.form_submit_button("🔍 Évaluer / Mettre à jour l'aperçu")
 
-            # valeurs évaluées (formulaire si modifié, sinon valeurs d'origine)
-            eval_amount = amount if edit_mode else def_val["Montant"]
-            eval_pays   = pays if edit_mode else def_val["Pays"]
-            eval_pres   = pays_res if edit_mode else def_val["PaysResidence"]
-            eval_carte  = carte if edit_mode else def_val["Carte"]
-            eval_dev    = device if edit_mode else def_val["DeviceType"]
-            eval_enl    = en_ligne if edit_mode else def_val["EnLigne"]
+            # ===== Evaluation =====
+            if edit_mode:
+                # l’agent a modifié : on encode les nouveaux libellés
+                vals = {
+                    "ClientID": client_id,
+                    "Amount": amount,
+                    "Heure": heure, "HeurePreferee": heure_pref, "DeltaHeure": delta_heure,
+                    "NbTransactions24h": nb_tx_24h,
+                    "Pays": encoders["Pays"].transform([pays])[0],
+                    "PaysResidence": encoders["PaysResidence"].transform([pays_res])[0],
+                    "Carte": encoders["Carte"].transform([carte])[0],
+                    "DeviceType": encoders["DeviceType"].transform([device])[0],
+                    "EnLigne": encoders["EnLigne"].transform([en_ligne])[0],
+                }
+                amount_eval = amount
+            else:
+                # Aucune modif : on réutilise exactement les CODES d'origine (pas de transform => pas d'erreur)
+                vals = {
+                    "ClientID": def_val["ClientID"],
+                    "Amount": def_val["Montant"],
+                    "Heure": def_val["Heure"], "HeurePreferee": def_val["HeurePreferee"], "DeltaHeure": def_val["DeltaHeure"],
+                    "NbTransactions24h": def_val["NbTransactions24h"],
+                    "Pays": def_val["PaysCode"],
+                    "PaysResidence": def_val["PaysResidenceCode"],
+                    "Carte": def_val["CarteCode"],
+                    "DeviceType": def_val["DeviceTypeCode"],
+                    "EnLigne": def_val["EnLigneCode"],
+                }
+                amount_eval = def_val["Montant"]
 
-            vals = {
-                "ClientID": client_id if edit_mode else def_val["ClientID"],
-                "Amount": eval_amount,
-                "Heure": heure if edit_mode else def_val["Heure"],
-                "HeurePreferee": heure_pref if edit_mode else def_val["HeurePreferee"],
-                "DeltaHeure": delta_heure if edit_mode else def_val["DeltaHeure"],
-                "NbTransactions24h": nb_tx_24h if edit_mode else def_val["NbTransactions24h"],
-                "Pays": encoders["Pays"].transform([eval_pays])[0],
-                "PaysResidence": encoders["PaysResidence"].transform([eval_pres])[0],
-                "Carte": encoders["Carte"].transform([eval_carte])[0],
-                "DeviceType": encoders["DeviceType"].transform([eval_dev])[0],
-                "EnLigne": encoders["EnLigne"].transform([eval_enl])[0],
-            }
             dfi = pd.DataFrame([vals])
             proba = float(model.predict_proba(dfi)[0][1])
             pred_fraude = proba > seuil_conseiller
             reco = ("Aucune" if proba <= seuil_conseiller else
-                    "Confirmation manuelle" if eval_amount <= 500 else
-                    "Demande SMS" if 100 < eval_amount <= 1000 else
+                    "Confirmation manuelle" if amount_eval <= 500 else
+                    "Demande SMS" if 100 < amount_eval <= 1000 else
                     "Blocage et contact conseiller")
 
             c1, c2 = st.columns([1,1])
@@ -362,7 +382,6 @@ else:
                         st.error("Échec de la mise à jour.")
 
             with c2:
-                # Graphiques réservés au conseiller
                 fig = go.Figure(go.Indicator(
                     mode="gauge+number", value=proba*100, number={'suffix': "%"},
                     gauge={'axis': {'range':[0,100]}, 'bar': {'thickness':0.25},
