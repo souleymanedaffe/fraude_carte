@@ -1,12 +1,14 @@
 # app.py
 # -*- coding: utf-8 -*-
 import os
+import csv
 from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from pandas.errors import ParserError
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
@@ -36,6 +38,11 @@ DATA_PATH = "fake_transactions_balanced.csv"
 HISTO_PATH = "historique_fraude.csv"
 SEUIL_USER = 0.50  # seuil fixe côté utilisateur
 
+COLUMNS_HISTO = [
+    "ID","Date","ClientID","Montant","Probabilité","Fraude",
+    "ActionRecommandée","Statut","Décision","Décideur"
+]
+
 @st.cache_data(show_spinner=False)
 def charger_donnees(path: str = DATA_PATH):
     df = pd.read_csv(path)
@@ -55,13 +62,43 @@ def entrainer_modele(df: pd.DataFrame):
     return model
 
 def ensure_histo():
-    if not os.path.exists(HISTO_PATH):
-        pd.DataFrame(columns=[
-            "ID","Date","ClientID","Montant","Probabilité","Fraude",
-            "ActionRecommandée","Statut","Décision","Décideur"
-        ]).to_csv(HISTO_PATH, index=False)
+    """Crée un fichier d'historique vide et propre s'il n'existe pas ou s'il est vide."""
+    if (not os.path.exists(HISTO_PATH)) or os.path.getsize(HISTO_PATH) == 0:
+        pd.DataFrame(columns=COLUMNS_HISTO).to_csv(
+            HISTO_PATH, index=False, encoding="utf-8", quoting=csv.QUOTE_MINIMAL
+        )
+
+def charger_historique():
+    """Lecture robuste de l'historique. Si corrompu -> sauvegarde .bak + réinitialisation propre."""
+    ensure_histo()
+    try:
+        df = pd.read_csv(
+            HISTO_PATH,
+            encoding="utf-8",
+            engine="python",
+            on_bad_lines="skip",
+            dtype=str
+        )
+        # garantit toutes les colonnes
+        for col in COLUMNS_HISTO:
+            if col not in df.columns:
+                df[col] = ""
+        df = df[COLUMNS_HISTO]
+        return df
+    except (ParserError, UnicodeDecodeError, OSError):
+        # sauvegarde le fichier corrompu puis repart propre
+        try:
+            bak = HISTO_PATH + "." + datetime.now().strftime("%Y%m%d_%H%M%S") + ".bak"
+            if os.path.exists(HISTO_PATH):
+                os.replace(HISTO_PATH, bak)
+        finally:
+            pd.DataFrame(columns=COLUMNS_HISTO).to_csv(
+                HISTO_PATH, index=False, encoding="utf-8", quoting=csv.QUOTE_MINIMAL
+            )
+        return pd.DataFrame(columns=COLUMNS_HISTO)
 
 def enregistrer_historique(client_id, amount, proba, is_fraude, action_reco):
+    """Ajoute une ligne à l'historique en garantissant un CSV propre."""
     ensure_histo()
     rec_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
     row = {
@@ -76,22 +113,26 @@ def enregistrer_historique(client_id, amount, proba, is_fraude, action_reco):
         "Décision": "",
         "Décideur": "",
     }
-    pd.DataFrame([row]).to_csv(HISTO_PATH, mode="a", header=not os.path.exists(HISTO_PATH) or os.path.getsize(HISTO_PATH)==0, index=False)
+    write_header = (not os.path.exists(HISTO_PATH)) or os.path.getsize(HISTO_PATH) == 0
+    pd.DataFrame([row]).to_csv(
+        HISTO_PATH,
+        mode="a",
+        header=write_header,
+        index=False,
+        encoding="utf-8",
+        quoting=csv.QUOTE_MINIMAL,
+    )
     return rec_id
-
-def charger_historique():
-    ensure_histo()
-    return pd.read_csv(HISTO_PATH)
 
 def maj_statut(rec_id: str, statut: str, decision: str, decideur: str = "Conseiller"):
     ensure_histo()
-    df = pd.read_csv(HISTO_PATH)
+    df = charger_historique()
     mask = df["ID"].astype(str) == str(rec_id)
     if mask.any():
         df.loc[mask, "Statut"] = statut
         df.loc[mask, "Décision"] = decision
         df.loc[mask, "Décideur"] = decideur
-        df.to_csv(HISTO_PATH, index=False)
+        df.to_csv(HISTO_PATH, index=False, encoding="utf-8", quoting=csv.QUOTE_MINIMAL)
         return True
     return False
 
@@ -120,7 +161,7 @@ importances = model.feature_importances_
 importance_df = pd.DataFrame({"Feature": features, "Importance": importances}).sort_values("Importance", ascending=True)
 
 # =========================
-# SWITCH ENTRE PARTIES
+# HEADER + SWITCH
 # =========================
 st.markdown("""
 <div class="hero">
@@ -238,7 +279,6 @@ if mode == "Espace Utilisateur":
 # =========================
 else:
     st.title("🛡️ Espace Conseiller")
-    # Conseiller peut ajuster le seuil (interne uniquement)
     seuil_conseiller = st.slider("Seuil de décision (interne conseiller)", 0.05, 0.95, 0.50, 0.01)
 
     tab1, tab2, tab3 = st.tabs(["📝 Saisie & Reco", "📊 Analyses", "🧾 Historique & Validation"])
